@@ -1,0 +1,205 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .item-badge {
+        background: rgba(6, 14, 9, 0.75);
+        border: 1px solid rgba(144, 198, 124, 0.65);
+        color: #C9F4B8;
+        font-weight: 700;
+        text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+    }
+    .price-pill {
+        background: rgba(0,0,0,0.6);
+        padding: 2px 6px;
+        border-radius: 6px;
+        font-size: 11px;
+        letter-spacing: 0.02em;
+    }
+    .value-label {
+        color: rgba(255,255,255,0.7);
+    }
+    .value-percent {
+        color: #90C67C;
+        font-weight: 700;
+    }
+    .recycle-link {
+        color: #ff6b6b;
+        font-weight: 600;
+    }
+    .recycle-link:hover {
+        color: #ffd0d0;
+    }
+</style>
+<div class="pb-24 px-4 pt-6">
+
+    <div class="bg-gray-800 rounded-3xl p-6 shadow-2xl mb-8 border border-gray-700 relative overflow-hidden group">
+        <div class="absolute top-0 right-0 -mt-4 -mr-4 w-32 h-32 bg-blue-500 blur-[80px] opacity-20 rounded-full pointer-events-none"></div>
+
+        <div class="relative z-10">
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="bg-blue-900/50 text-blue-300 text-[10px] font-bold px-2 py-1 rounded border border-blue-800 uppercase tracking-wider">
+                            Style Algorithm
+                        </span>
+                    </div>
+                    <h1 class="text-3xl font-bold text-white mt-2">
+                        {{ season_details.icon }} {{ profile.season }}
+                    </h1>
+                    <p class="text-gray-400 text-xs font-mono mt-1">
+                        Formula: {{ season_details.formula }}
+                    </p>
+                </div>
+                
+                <a href="{% url 'add_garment' %}" class="bg-blue-600 hover:bg-blue-500 text-white w-12 h-12 rounded-full flex items-center justify-center text-2xl shadow-lg transition transform hover:scale-105 border border-blue-400">
+                    +
+                </a>
+            </div>
+
+            <div class="bg-gray-900/50 p-4 rounded-xl mb-6 backdrop-blur-md border border-gray-700">
+                <p class="italic text-gray-300 text-sm">"{{ season_details.desc }}"</p>
+                <div class="mt-3 text-xs text-gray-400 flex gap-4 border-t border-gray-700 pt-3">
+                    <span class="flex items-center gap-1">Undertone: <b class="text-white">{{ profile.skin_undertone }}</b></span>
+                    <span class="flex items-center gap-1">Contrast: <b class="text-white">{{ profile.contrast_level }}</b></span>
+                </div>
+            </div>
+
+            
+
+        <div class="grid grid-cols-2 gap-4">
+                <div class="bg-gray-900/40 p-3 rounded-xl border border-green-500/20">
+                    <h3 class="text-green-400 font-bold text-[10px] uppercase mb-2 tracking-wide flex items-center gap-1">
+                        Power Colors
+                    </h3>
+                    <div class="flex flex-wrap gap-1.5">
+                        {% for color in season_details.best_colors %}
+                        <span class="bg-green-500/10 text-green-300 text-[10px] px-2 py-1 rounded border border-green-500/20">
+                            {{ color }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="bg-gray-900/40 p-3 rounded-xl border border-red-500/20">
+                    <h3 class="text-red-400 font-bold text-[10px] uppercase mb-2 tracking-wide flex items-center gap-1">
+                        Avoid
+                    </h3>
+                    <div class="flex flex-wrap gap-1.5">
+                        {% for color in season_details.avoid_colors %}
+                        <span class="bg-red-500/10 text-red-300 text-[10px] px-2 py-1 rounded border border-red-500/20">
+                            {{ color }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-gradient-to-r from-emerald-900 to-teal-900 rounded-3xl p-6 shadow-2xl mb-8 relative overflow-hidden border border-emerald-700/50">
+        <div class="relative z-10 flex justify-between items-center">
+            <div>
+                <h2 class="text-2xl font-bold text-emerald-100">Green Score</h2>
+                <p class="text-emerald-400 text-xs">Sustainability Level: <span class="text-white font-bold">Eco-Warrior</span></p>
+            </div>
+            <div class="text-right">
+                <span class="text-5xl font-black text-white tracking-tighter">{{ profile.green_points }}</span>
+                <span class="block text-[10px] uppercase tracking-widest text-emerald-400">Points</span>
+            </div>
+        </div>
+        <div class="mt-4 bg-emerald-900/50 h-2 rounded-full overflow-hidden">
+            <div class="bg-emerald-400 h-full" style="width: {% widthratio profile.green_points 1000 100 %}%"></div> 
+        </div>
+    </div>
+
+    <div>
+        <div class="flex justify-between items-end mb-4">
+            <h2 class="text-white font-bold text-xl">Digital Wardrobe</h2>
+            <span class="text-xs text-gray-400 border border-gray-700 px-2 py-1 rounded-lg bg-gray-800">
+                {{ item_count }} Items - <span class="text-green-400 font-bold">INR {{ total_value }}</span>
+            </span>
+        </div>
+        
+        <form method="get" class="bg-gray-800/60 border border-gray-700 rounded-2xl p-3 mb-4">
+            <div class="text-[10px] uppercase tracking-widest text-gray-400 mb-2">Filters</div>
+            <div class="flex flex-wrap gap-2">
+                {% for opt in filter_options %}
+                <label class="flex items-center gap-2 text-xs text-gray-300 bg-gray-900/70 px-2 py-1 rounded-lg border border-gray-700">
+                    <input type="checkbox" name="filter" value="{{ opt }}" class="rounded" {% if opt in active_filters %}checked{% endif %}>
+                    {{ opt|capfirst }}
+                </label>
+                {% endfor %}
+                <button type="submit" class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded-lg font-bold">
+                    Apply
+                </button>
+                <a href="{% url 'dashboard' %}" class="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded-lg font-bold">
+                    Clear
+                </a>
+            </div>
+        </form>
+
+        <div class="grid grid-cols-2 gap-4">
+            {% for item in clothes %}
+            <div class="bg-gray-800 rounded-xl overflow-hidden shadow-lg border border-gray-700 relative group transition hover:border-gray-500 flex flex-col">
+                
+                <form action="{% url 'delete_garment' item.id %}" method="post" class="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {% csrf_token %}
+                    <button type="submit" onclick="return confirm('Delete item?')" class="bg-gray-900/80 text-red-400 w-8 h-8 rounded-full flex items-center justify-center hover:bg-red-900/80 border border-red-900/30 backdrop-blur-sm">
+                        X
+                    </button>
+                </form>
+
+                {% if item.is_match %}
+                <div class="absolute top-2 left-2 z-10 item-badge text-[10px] px-2 py-1 rounded backdrop-blur-sm shadow-sm">
+                    Perfect Match
+                </div>
+                {% endif %}
+
+                <div class="h-48 overflow-hidden bg-gray-900 relative">
+                    <img src="{{ item.image.url }}" class="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition">
+                    <div class="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/80 to-transparent p-2">
+                        <span class="text-white font-bold text-xs price-pill">INR {{ item.purchase_price }}</span>
+                    </div>
+                </div>
+
+                <div class="p-3 flex-1 flex flex-col justify-between">
+                    <div>
+                        <h3 class="font-bold text-gray-200 text-sm truncate">{{ item.name }}</h3>
+                        <p class="text-[10px] text-gray-500 uppercase tracking-wide mb-2">{{ item.category }}</p>
+                        
+                        <div class="mb-2">
+                            <div class="flex justify-between text-[10px] mb-1">
+                                <span class="value-label">Value Recovered</span>
+                                <span class="value-percent">{{ item.break_even_status }}%</span>
+                            </div>
+                            <div class="w-full bg-gray-700 h-1.5 rounded-full overflow-hidden">
+                                <div class="bg-gradient-to-r from-blue-500 to-green-500 h-full" style="width: {{ item.break_even_status }}%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between pt-2 border-t border-gray-700 mt-1">
+                         <span class="text-[10px] bg-gray-700 text-gray-300 px-2 py-1 rounded-full">
+                            {{ item.wear_count }} Wears
+                        </span>
+                        
+                        <a href="{% url 'discard_guide' item.id %}" class="text-xs recycle-link flex items-center gap-1">
+                             Recycle
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-span-2 text-center py-12 bg-gray-800 rounded-xl border border-dashed border-gray-600">
+                <div class="text-4xl mb-3"></div>
+                <p class="text-gray-400 mb-4 text-sm">Your digital wardrobe is empty.</p>
+                <a href="{% url 'add_garment' %}" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-xs font-bold transition">
+                    Scan your first outfit
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

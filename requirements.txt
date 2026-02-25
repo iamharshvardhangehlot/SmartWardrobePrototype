@@ -1,0 +1,13 @@
+Django==6.0
+gunicorn==21.2.0
+whitenoise==6.6.0
+requests==2.31.0
+replicate==0.34.1
+rembg==2.0.56
+onnxruntime==1.17.3
+Pillow==10.2.0
+numpy==1.26.4
+opencv-python==4.9.0.80
+scikit-learn==1.4.2
+transformers==4.38.2
+torch==2.2.1

@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+staticfiles/
+frontend_ui/node_modules/
+frontend_ui/dist/
+core/static/app/
+.env

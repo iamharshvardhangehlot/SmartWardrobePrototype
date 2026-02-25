@@ -1,0 +1,364 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+    :root {
+        --c-emerald: #328E6E;
+        --c-leaf: #67AE6E;
+        --c-lime: #90C67C;
+        --c-cream: #E1EEBC;
+        --c-dark: #050b08;
+        --c-surface: rgba(11, 20, 16, 0.7);
+        --c-line: rgba(225, 238, 188, 0.1);
+    }
+
+    body {
+        font-family: 'Outfit', sans-serif;
+        background-color: var(--c-dark);
+        overflow-x: hidden;
+    }
+
+    .noise-overlay {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.07'/%3E%3C/svg%3E");
+        opacity: 0.05;
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    .blob {
+        position: fixed;
+        border-radius: 50%;
+        filter: blur(90px);
+        opacity: 0.55;
+        z-index: 0;
+        animation: float 22s infinite alternate cubic-bezier(0.4, 0, 0.2, 1);
+        pointer-events: none;
+    }
+    .blob-1 { top: -12%; left: -18%; width: 520px; height: 520px; background: var(--c-emerald); }
+    .blob-2 { bottom: -14%; right: -18%; width: 640px; height: 640px; background: var(--c-emerald); opacity: 0.35; animation-delay: -6s; }
+    .blob-3 { top: 40%; left: 42%; width: 380px; height: 380px; background: var(--c-leaf); opacity: 0.28; animation-delay: -10s; }
+
+    @keyframes float {
+        0% { transform: translate(0, 0) scale(1); }
+        100% { transform: translate(28px, 48px) scale(1.08); }
+    }
+
+    .glass {
+        background: var(--c-surface);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        border: 1px solid var(--c-line);
+    }
+
+    .pill {
+        border-radius: 999px;
+        border: 1px solid rgba(103, 174, 110, 0.4);
+        color: var(--c-lime);
+        font-size: 10px;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        padding: 6px 12px;
+    }
+
+    .mood-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 22px;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+    .mood-card:hover {
+        transform: translateY(-6px);
+        border-color: rgba(103, 174, 110, 0.6);
+        box-shadow: 0 18px 34px rgba(0, 0, 0, 0.35);
+    }
+
+    .divider {
+        height: 1px;
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    .drawer-panel {
+        background: linear-gradient(180deg, rgba(9, 15, 12, 0.98) 0%, rgba(11, 20, 16, 0.98) 100%);
+        border-left: 1px solid rgba(103, 174, 110, 0.3);
+    }
+
+    .drawer-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 16px;
+        border-radius: 16px;
+        border: 1px solid rgba(225, 238, 188, 0.08);
+        background: rgba(255, 255, 255, 0.04);
+        transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .drawer-item:hover {
+        transform: translateX(-2px);
+        border-color: rgba(103, 174, 110, 0.5);
+        background: rgba(103, 174, 110, 0.12);
+    }
+</style>
+
+<div class="noise-overlay"></div>
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+<div class="blob blob-3"></div>
+
+<div class="relative overflow-hidden min-h-screen">
+<div class="min-h-screen flex flex-col p-6 relative z-20 max-w-5xl mx-auto w-full">
+    <div class="flex justify-between items-center w-full mb-10 px-2">
+        <div>
+            <div class="text-xs uppercase tracking-[0.35em] text-[#90C67C]">Smart Wardrobe</div>
+            <div class="text-2xl font-semibold text-[#E1EEBC]">Your Personal Stylist</div>
+        </div>
+        <button id="menu-toggle" class="glass group flex items-center gap-3 px-5 py-3 rounded-full transition-all hover:bg-[#E1EEBC] hover:text-[#050b08]">
+            <span class="text-xs font-bold tracking-widest uppercase group-hover:text-[#050b08] text-[#E1EEBC]">Menu</span>
+            <svg class="w-4 h-4 text-[#90C67C] group-hover:text-[#050b08]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+        </button>
+    </div>
+
+    <div class="glass rounded-3xl p-5 mb-8">
+        <div class="flex items-start justify-between gap-6">
+            <div>
+                <div class="pill">Today</div>
+                <div class="text-2xl font-semibold text-[#E1EEBC] mt-3">{{ now|date:"l, M d" }}</div>
+                <div class="text-sm text-[#E1EEBC]/70">{{ now|time:"g:i A" }}</div>
+                <div class="text-sm mt-3 text-[#E1EEBC]">
+                    {% if profile.city %}
+                        {{ weather_context.city }} &middot;
+                    {% else %}
+                        Set location &middot;
+                    {% endif %}
+                    {% if weather_context.temp_c or weather_context.temp_c == 0 %}
+                        {{ weather_context.temp_c }}&deg;C
+                    {% else %}
+                        Weather unavailable
+                    {% endif %}
+                </div>
+                {% if weather_context.description %}
+                    <div class="text-xs text-[#E1EEBC]/60">{{ weather_context.description }}</div>
+                {% endif %}
+            </div>
+            <div class="text-right">
+                <div class="text-[10px] uppercase tracking-[0.25em] text-[#90C67C]">Green Score</div>
+                <div class="text-3xl font-bold text-[#E1EEBC] mt-2">{{ profile.green_points }}</div>
+                <div class="text-xs text-[#E1EEBC]/60">Eco Level: Warrior</div>
+            </div>
+        </div>
+        <div class="divider my-4"></div>
+        <div class="flex items-center justify-between">
+            <div class="text-xs text-[#E1EEBC]/60">Advanced Stylist</div>
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input id="advanced-stylist-toggle" type="checkbox" class="sr-only" {% if advanced_enabled %}checked{% endif %} {% if not advanced_available %}disabled{% endif %}>
+                <div id="advanced-stylist-track" class="w-9 h-5 bg-gray-700 rounded-full transition"></div>
+                <span class="absolute left-1 top-1 w-3 h-3 bg-white rounded-full transition-transform" id="advanced-stylist-knob"></span>
+            </label>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4 mb-8">
+        <a href="{% url 'generate_outfit' %}?mood=Casual" class="mood-card p-6">
+            <div class="text-xs uppercase tracking-[0.2em] text-[#90C67C]">Casual</div>
+            <div class="text-2xl font-semibold text-[#E1EEBC] mt-3">Easy Day</div>
+        </a>
+        <a href="{% url 'generate_outfit' %}?mood=Formal" class="mood-card p-6">
+            <div class="text-xs uppercase tracking-[0.2em] text-[#90C67C]">Work</div>
+            <div class="text-2xl font-semibold text-[#E1EEBC] mt-3">Sharp Focus</div>
+        </a>
+        <a href="{% url 'generate_outfit' %}?mood=Party" class="mood-card p-6">
+            <div class="text-xs uppercase tracking-[0.2em] text-[#90C67C]">Party</div>
+            <div class="text-2xl font-semibold text-[#E1EEBC] mt-3">Night Mode</div>
+        </a>
+        <a href="{% url 'generate_outfit' %}?mood=Sport" class="mood-card p-6">
+            <div class="text-xs uppercase tracking-[0.2em] text-[#90C67C]">Gym</div>
+            <div class="text-2xl font-semibold text-[#E1EEBC] mt-3">Training</div>
+        </a>
+    </div>
+
+    <div class="glass rounded-3xl p-5">
+        <div class="flex items-center justify-between mb-3">
+            <div class="text-xs uppercase tracking-[0.25em] text-[#90C67C]">Upcoming</div>
+            <a href="{% url 'dashboard' %}" class="text-[10px] uppercase tracking-[0.25em] text-[#E1EEBC]/60">Wardrobe</a>
+        </div>
+        {% if upcoming_schedules %}
+            <div class="space-y-2">
+                {% for sched in upcoming_schedules %}
+                    <div class="flex items-center justify-between text-xs text-[#E1EEBC]">
+                        <span>{{ sched.scheduled_date|date:"M d" }} &middot; {% if sched.top %}{{ sched.top.name }}{% else %}Top{% endif %} + {% if sched.bottom %}{{ sched.bottom.name }}{% else %}Bottom{% endif %}</span>
+                        <span class="text-[10px] uppercase tracking-[0.2em] text-[#90C67C]">{{ sched.source }}</span>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-xs text-[#E1EEBC]/60">No upcoming looks yet.</div>
+        {% endif %}
+    </div>
+    </div>
+
+    <div id="menu-backdrop" class="hidden absolute inset-0 bg-black/60 z-40"></div>
+    <aside id="menu-panel" class="absolute top-0 right-0 h-full w-[90%] max-w-sm drawer-panel z-50 transform translate-x-full transition-transform duration-300 shadow-2xl">
+        <div class="p-6 flex items-center justify-between border-b border-white/10">
+            <div>
+                <div class="text-xs uppercase tracking-[0.35em] text-[#90C67C]">Smart Wardrobe</div>
+                <h3 class="text-[#E1EEBC] text-lg font-bold tracking-widest uppercase">Menu</h3>
+            </div>
+            <button id="menu-close" class="text-[#E1EEBC]/70 hover:text-white text-xl">&times;</button>
+        </div>
+
+        <div class="p-6 space-y-6">
+            <div class="text-[10px] uppercase tracking-[0.25em] text-[#90C67C]/70">Navigation</div>
+            <nav class="space-y-3">
+                <a href="{% url 'dashboard' %}" class="drawer-item text-sm text-[#E1EEBC]">Dashboard <span class="text-[#90C67C]">&rarr;</span></a>
+                <a href="{% url 'add_garment' %}" class="drawer-item text-sm text-[#E1EEBC]">Add Item <span class="text-[#90C67C]">&rarr;</span></a>
+                <a href="{% url 'lookbook' %}" class="drawer-item text-sm text-[#E1EEBC]">Lookbook <span class="text-[#90C67C]">&rarr;</span></a>
+                <a href="{% url 'setup' %}" class="drawer-item text-sm text-[#E1EEBC]">Settings <span class="text-[#90C67C]">&rarr;</span></a>
+            </nav>
+
+            <div class="divider"></div>
+
+            <div class="glass p-4 rounded-2xl">
+                <div class="text-xs uppercase tracking-widest text-[#90C67C] font-bold mb-2">Green Score</div>
+                <div class="text-3xl font-extrabold text-white">{{ profile.green_points }}</div>
+                <div class="text-[11px] text-[#E1EEBC]/70">Total points earned</div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div class="glass p-3 rounded-2xl">
+                    <div class="text-[10px] uppercase tracking-widest text-[#90C67C] mb-1">CO2 Saved</div>
+                    <div class="text-xl font-bold text-white">{{ impact_summary.carbon_saved_kg|default:0 }} kg</div>
+                </div>
+                <div class="glass p-3 rounded-2xl">
+                    <div class="text-[10px] uppercase tracking-widest text-[#90C67C] mb-1">Water Saved</div>
+                    <div class="text-xl font-bold text-white">{{ impact_summary.water_saved_l|default:0 }} L</div>
+                </div>
+                <div class="glass p-3 rounded-2xl">
+                    <div class="text-[10px] uppercase tracking-widest text-[#90C67C] mb-1">Energy Saved</div>
+                    <div class="text-xl font-bold text-white">{{ impact_summary.energy_saved_kwh|default:0 }} kWh</div>
+                </div>
+                <div class="glass p-3 rounded-2xl">
+                    <div class="text-[10px] uppercase tracking-widest text-[#90C67C] mb-1">Avg Wears</div>
+                    <div class="text-xl font-bold text-white">{{ impact_summary.avg_wears|default:0 }}</div>
+                </div>
+            </div>
+
+            <div class="glass p-4 rounded-2xl">
+                <div class="text-xs uppercase tracking-widest text-[#90C67C] font-bold mb-2">Wardrobe Stats</div>
+                <div class="text-sm text-[#E1EEBC]/80 flex flex-col gap-2">
+                    <span>Total items: <b class="text-white">{{ impact_summary.total_items|default:0 }}</b></span>
+                    <span>Total wears: <b class="text-white">{{ impact_summary.total_wears|default:0 }}</b></span>
+                    <span>Donated: <b class="text-white">{{ impact_summary.donated_count|default:0 }}</b></span>
+                    <span>Recycled: <b class="text-white">{{ impact_summary.recycled_count|default:0 }}</b></span>
+                </div>
+            </div>
+        </div>
+    </aside>
+</div>
+
+<script>
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) {
+            return parts.pop().split(';').shift();
+        }
+        return '';
+    }
+
+    function openMenu() {
+        const panel = document.getElementById('menu-panel');
+        const backdrop = document.getElementById('menu-backdrop');
+        if (panel && backdrop) {
+            panel.classList.remove('translate-x-full');
+            backdrop.classList.remove('hidden');
+        }
+    }
+
+    function closeMenu() {
+        const panel = document.getElementById('menu-panel');
+        const backdrop = document.getElementById('menu-backdrop');
+        if (panel && backdrop) {
+            panel.classList.add('translate-x-full');
+            backdrop.classList.add('hidden');
+        }
+    }
+
+    const menuToggle = document.getElementById('menu-toggle');
+    const menuClose = document.getElementById('menu-close');
+    const menuBackdrop = document.getElementById('menu-backdrop');
+
+    if (menuToggle) menuToggle.addEventListener('click', openMenu);
+    if (menuClose) menuClose.addEventListener('click', closeMenu);
+    if (menuBackdrop) menuBackdrop.addEventListener('click', closeMenu);
+
+    (function setupAdvancedToggle() {
+        const toggle = document.getElementById('advanced-stylist-toggle');
+        const knob = document.getElementById('advanced-stylist-knob');
+        const track = document.getElementById('advanced-stylist-track');
+        if (!toggle) return;
+
+        function syncKnob() {
+            if (toggle.checked) {
+                knob.style.transform = 'translateX(16px)';
+                if (track) track.style.backgroundColor = '#67AE6E';
+            } else {
+                knob.style.transform = 'translateX(0px)';
+                if (track) track.style.backgroundColor = '#374151';
+            }
+        }
+        syncKnob();
+
+        toggle.addEventListener('change', () => {
+            syncKnob();
+            const formData = new FormData();
+            formData.append('enabled', toggle.checked ? 'true' : 'false');
+            formData.append('csrfmiddlewaretoken', getCookie('csrftoken'));
+            fetch('{% url "update_advanced_stylist" %}', {
+                method: 'POST',
+                body: formData
+            }).catch(() => {});
+        });
+    })();
+
+    (function autoDetectCity() {
+        const hasCity = "{{ profile.city|default:'' }}" !== "";
+        if (hasCity || !navigator.geolocation) return;
+
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const lat = pos.coords.latitude;
+                const lon = pos.coords.longitude;
+                fetch(`/resolve-location/?lat=${lat}&lon=${lon}`)
+                    .then((res) => res.json())
+                    .then((data) => {
+                        if (data.status === 'success' && data.city) {
+                            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+                            const formData = new FormData();
+                            formData.append('city', data.city);
+                            formData.append('timezone', tz);
+                            formData.append('csrfmiddlewaretoken', getCookie('csrftoken'));
+                            return fetch("{% url 'update_location' %}", {
+                                method: 'POST',
+                                body: formData
+                            }).then(() => {
+                                window.location.reload();
+                            });
+                        }
+                    })
+                    .catch(() => {});
+            },
+            () => {},
+            { timeout: 4000 }
+        );
+    })();
+</script>
+{% endblock %}

@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="p-6 pb-24">
+    <a href="{% url 'dashboard' %}" class="text-gray-400 text-sm mb-4 inline-block"><- Back</a>
+
+    <h1 class="text-2xl font-bold text-white mb-2">Responsible Disposal</h1>
+    <p class="text-gray-400 text-sm mb-6">Choose how you want to retire <b>{{ garment.name }}</b>. We've listed guides for all common materials below.</p>
+
+    <div class="grid grid-cols-2 gap-4 mb-8">
+        <button onclick="confirmAction('Donate')" class="bg-blue-600 hover:bg-blue-500 p-4 rounded-xl text-center transition">
+            <span class="font-bold text-white">Donate</span>
+            <span class="text-xs text-blue-200 block mt-1">+100 Points</span>
+        </button>
+        <button onclick="confirmAction('Recycle')" class="bg-green-600 hover:bg-green-500 p-4 rounded-xl text-center transition">
+            <span class="font-bold text-white">Recycle/Compost</span>
+            <span class="text-xs text-green-200 block mt-1">+150 Points</span>
+        </button>
+    </div>
+
+    <div class="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+        <h3 class="text-lg font-bold text-white mb-4">Material Guide</h3>
+
+        <div class="space-y-4">
+            <div class="border-b border-gray-700 pb-4">
+                <h4 class="text-green-400 font-bold text-sm mb-1">Pure Cotton / Linen / Wool</h4>
+                <p class="text-gray-400 text-xs">These are natural. If 100% pure, remove buttons/zippers, cut into shreds, and <b>Compost</b> them. They return to the earth.</p>
+            </div>
+
+            <div class="border-b border-gray-700 pb-4">
+                <h4 class="text-blue-400 font-bold text-sm mb-1">Polyester / Nylon / Acrylic</h4>
+                <p class="text-gray-400 text-xs">These are plastic-based. <b>Do not compost.</b> Send to specialized textile recycling centers or upcycle into cleaning rags.</p>
+            </div>
+
+            <div>
+                <h4 class="text-purple-400 font-bold text-sm mb-1">Mixed Blends (Poly-Cotton)</h4>
+                <p class="text-gray-400 text-xs">Hardest to recycle. Best option is to <b>Donate</b> if wearable, or use as durable cleaning cloths if damaged.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function confirmAction(action) {
+    if (confirm(`Are you sure you want to ${action} this item? It will be removed from your active wardrobe.`)) {
+        const formData = new FormData();
+        formData.append('action', action);
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+        fetch("", {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            alert(`Success! You earned ${data.points} Green Points.`);
+            window.location.href = "{% url 'dashboard' %}";
+        });
+    }
+}
+</script>
+{% endblock %}
