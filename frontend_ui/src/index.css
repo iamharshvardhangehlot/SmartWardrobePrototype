@@ -1711,6 +1711,50 @@ body.theme-dark {
   color: #e6e7ea;
 }
 
+/* ===== App Frame (tablet preview on desktop) ===== */
+.app-frame {
+  min-height: 100vh;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 24px 16px;
+  background: #2b2f33;
+}
+
+.app-shell {
+  width: 100%;
+  max-width: 540px;
+  min-height: 100vh;
+  background: #f7f7f5;
+  border-radius: 28px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  position: relative;
+}
+
+body.theme-dark .app-shell {
+  background: #0b0f14;
+}
+
+@media (max-width: 640px) {
+  .app-frame {
+    padding: 0;
+    background: #f7f7f5;
+    display: block;
+  }
+
+  body.theme-dark .app-frame {
+    background: #0b0f14;
+  }
+
+  .app-shell {
+    max-width: 100%;
+    min-height: 100vh;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
 body.theme-dark .bg-ivory {
   background-color: #0b0f14;
   background-image:

@@ -203,8 +203,10 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-ivory">
-      {renderScreen()}
+    <div className="app-frame">
+      <div className="app-shell">
+        <div className="min-h-screen bg-ivory">{renderScreen()}</div>
+      </div>
       {flash && (
         <div
           className="theme-flash"
