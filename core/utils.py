@@ -4,12 +4,28 @@ import cv2
 import numpy as np
 from PIL import Image
 from sklearn.cluster import KMeans
-from transformers import pipeline
 
 # --- 1. SETUP THE AI MODELS ---
-# We use a "Zero-Shot Image Classification" model. 
-# It lets us define any categories we want on the fly.
-classifier = pipeline("zero-shot-image-classification", model="openai/clip-vit-base-patch32")
+# Heavy models are loaded lazily to avoid OOM at server boot (Render free tier).
+_classifier = None
+
+
+def _get_classifier():
+    global _classifier
+    if _classifier is not None:
+        return _classifier
+
+    # Allow disabling HF on low-memory hosts.
+    if os.getenv("DISABLE_HF", "").lower() in {"1", "true", "yes"}:
+        return None
+
+    try:
+        from transformers import pipeline
+        _classifier = pipeline("zero-shot-image-classification", model="openai/clip-vit-base-patch32")
+    except Exception:
+        _classifier = None
+
+    return _classifier
 
 def get_dominant_color_hex(image_path):
     """
@@ -55,14 +71,20 @@ def analyze_garment(image_path):
     
     # ... (rest of the code stays the same) ...
     
-    # 3. RUN AI SCANS
-    # Scan for Category
-    cat_results = classifier(image, candidate_labels=candidate_categories)
-    top_category = cat_results[0]['label'] # The #1 match
-    
-    # Scan for Pattern
-    pat_results = classifier(image, candidate_labels=candidate_patterns)
-    top_pattern = pat_results[0]['label']
+    classifier = _get_classifier()
+    if classifier:
+        # 3. RUN AI SCANS
+        # Scan for Category
+        cat_results = classifier(image, candidate_labels=candidate_categories)
+        top_category = cat_results[0]['label']  # The #1 match
+
+        # Scan for Pattern
+        pat_results = classifier(image, candidate_labels=candidate_patterns)
+        top_pattern = pat_results[0]['label']
+    else:
+        # Fallback (low-memory mode): best-effort defaults
+        top_category = "Top"
+        top_pattern = "Plain Solid Color Fabric"
     
     # 4. Get Color
     hex_code = get_dominant_color_hex(image_path)
