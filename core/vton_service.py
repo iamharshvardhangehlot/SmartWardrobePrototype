@@ -45,21 +45,24 @@ def generate_tryon(
         else:
             with open(human_image_input, "rb") as f:
                 input_bytes = f.read()
-            try:
-                from rembg import remove
-                subject_only = remove(input_bytes)
-
-                img = Image.open(io.BytesIO(subject_only)).convert("RGBA")
-                white_bg = Image.new("RGBA", img.size, "WHITE")
-                white_bg.paste(img, (0, 0), img)
-                final_image = white_bg.convert("RGB")
-
-                buf = io.BytesIO()
-                final_image.save(buf, format="JPEG", quality=95)
-                human_input = buf
-            except Exception:
-                logger.warning("rembg unavailable; using original image for VTON.")
+            if os.getenv("DISABLE_REMBG", "").lower() in {"1", "true", "yes"}:
                 human_input = io.BytesIO(input_bytes)
+            else:
+                try:
+                    from rembg import remove
+                    subject_only = remove(input_bytes)
+
+                    img = Image.open(io.BytesIO(subject_only)).convert("RGBA")
+                    white_bg = Image.new("RGBA", img.size, "WHITE")
+                    white_bg.paste(img, (0, 0), img)
+                    final_image = white_bg.convert("RGB")
+
+                    buf = io.BytesIO()
+                    final_image.save(buf, format="JPEG", quality=95)
+                    human_input = buf
+                except Exception:
+                    logger.warning("rembg unavailable; using original image for VTON.")
+                    human_input = io.BytesIO(input_bytes)
 
         # ---------------------------------------------------------
         # STEP 2: PREPARE GARMENT

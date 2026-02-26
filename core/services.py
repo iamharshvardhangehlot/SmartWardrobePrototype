@@ -61,6 +61,9 @@ class GarmentService:
 
     @staticmethod
     def _remove_background(image_file):
+        if os.getenv("DISABLE_REMBG", "").lower() in {"1", "true", "yes"}:
+            logger.info("DISABLE_REMBG set; skipping background removal.")
+            return None
         try:
             image_file.seek(0)
         except Exception:
