@@ -1,5 +1,6 @@
 import os
 
+from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
 
@@ -15,6 +16,9 @@ class Command(BaseCommand):
             self.stdout.write("SEED_FIXTURE not set; skipping.")
             return
 
+        if not os.path.isabs(fixture_path):
+            fixture_path = os.path.join(settings.BASE_DIR, fixture_path)
+
         if not os.path.exists(fixture_path):
             self.stdout.write(f"Fixture not found: {fixture_path}")
             return
@@ -26,5 +30,9 @@ class Command(BaseCommand):
             return
 
         self.stdout.write(f"Loading fixture: {fixture_path}")
-        call_command("loaddata", fixture_path)
+        try:
+            call_command("loaddata", fixture_path)
+        except Exception as exc:
+            self.stdout.write(f"Fixture import failed: {exc}")
+            return
         self.stdout.write("Fixture import complete.")
