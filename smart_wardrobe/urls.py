@@ -1,9 +1,12 @@
 # smart_wardrobe/urls.py
+import os
+
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, re_path
 from django.http import HttpResponse
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.static import serve
 from core import views
 
 urlpatterns = [
@@ -39,4 +42,11 @@ urlpatterns = [
     path('api/schedules/<int:schedule_id>/delete/', views.api_schedule_delete, name='api_schedule_delete'),
     path('api/schedules/<int:schedule_id>/notify/', views.api_schedule_notify, name='api_schedule_notify'),
     
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+elif os.getenv("SERVE_MEDIA", "").lower() in {"1", "true", "yes"}:
+    urlpatterns += [
+        re_path(r"^media/(?P<path>.*)$", serve, {"document_root": settings.MEDIA_ROOT})
+    ]
