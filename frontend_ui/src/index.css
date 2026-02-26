@@ -1747,6 +1747,16 @@ body.theme-dark .app-shell {
   min-height: 100%;
 }
 
+/* Normalize screen containers inside tablet shell */
+.app-shell .app-content > .min-h-screen {
+  min-height: 100%;
+}
+
+/* Remove nav spacer padding inside the tablet shell */
+.app-shell .app-content > .min-h-screen.pb-20 {
+  padding-bottom: 0 !important;
+}
+
 @media (max-width: 640px) {
   .app-frame {
     padding: 0;
