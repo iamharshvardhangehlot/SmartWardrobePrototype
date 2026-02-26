@@ -16,8 +16,8 @@ const items: { icon: any; label: string; screen: Screen }[] = [
 
 export function BottomNav({ current, onNavigate }: BottomNavProps) {
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-sand px-4 py-3">
-      <div className="flex items-center justify-between max-w-md mx-auto">
+    <div className="bottom-nav">
+      <div className="bottom-nav__inner">
         {items.map((item) => {
           const active = current === item.screen;
           return (
