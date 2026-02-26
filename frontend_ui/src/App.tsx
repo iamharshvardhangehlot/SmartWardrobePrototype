@@ -206,7 +206,7 @@ export default function App() {
     <div className="app-frame">
       <div className="app-shell">
         <div className="app-scroll">
-          <div className="min-h-screen bg-ivory">{renderScreen()}</div>
+          <div className="app-content">{renderScreen()}</div>
         </div>
       </div>
       {flash && (
