@@ -19,8 +19,9 @@ class Command(BaseCommand):
             self.stdout.write(f"Fixture not found: {fixture_path}")
             return
 
-        # Avoid duplicate loads
-        if Garment.objects.exists() or UserProfile.objects.exists():
+        force = os.getenv("SEED_FORCE", "").lower() in {"1", "true", "yes"}
+        # Avoid duplicate loads unless explicitly forced
+        if not force and (Garment.objects.exists() or UserProfile.objects.exists()):
             self.stdout.write("Data already present; skipping fixture import.")
             return
 
