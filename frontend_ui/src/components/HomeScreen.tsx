@@ -76,6 +76,19 @@ export function HomeScreen({ onNavigate, onToggleTheme, darkMode, onViewSchedule
 
     fetchHome();
 
+    const tzName = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const lastTz = localStorage.getItem('sw_timezone');
+    if (tzName && tzName !== lastTz) {
+      const form = new FormData();
+      form.append('timezone', tzName);
+      apiPost('/update-location/', form)
+        .then(() => {
+          localStorage.setItem('sw_timezone', tzName);
+          fetchHome();
+        })
+        .catch(() => null);
+    }
+
     const lastUpdate = Number(localStorage.getItem('sw_last_location') || 0);
     const shouldRefreshLocation = !lastUpdate || Date.now() - lastUpdate > 6 * 60 * 60 * 1000;
 
@@ -92,9 +105,10 @@ export function HomeScreen({ onNavigate, onToggleTheme, darkMode, onViewSchedule
             if (payload?.status === 'success' && payload.city) {
               const form = new FormData();
               form.append('city', payload.city);
-              form.append('timezone', Intl.DateTimeFormat().resolvedOptions().timeZone);
+              form.append('timezone', tzName || Intl.DateTimeFormat().resolvedOptions().timeZone);
               await apiPost('/update-location/', form);
               localStorage.setItem('sw_last_location', String(Date.now()));
+              if (tzName) localStorage.setItem('sw_timezone', tzName);
               fetchHome();
             }
           } catch {
