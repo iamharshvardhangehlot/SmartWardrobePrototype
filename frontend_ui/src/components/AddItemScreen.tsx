@@ -1,7 +1,7 @@
 import { motion } from 'motion/react';
-import { ArrowLeft, Camera, Upload, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Camera, Upload, Image as ImageIcon, X } from 'lucide-react';
 import { Screen } from '../App';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { apiPost } from '../lib/api';
 
 interface AddItemScreenProps {
@@ -32,8 +32,85 @@ export function AddItemScreen({ onNavigate }: AddItemScreenProps) {
   const [bulkFabricType, setBulkFabricType] = useState('Cotton');
   const [status, setStatus] = useState('');
   const [saving, setSaving] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState('');
   const singleRef = useRef<HTMLInputElement>(null);
   const bulkRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+  };
+
+  const closeCamera = () => {
+    stopCamera();
+    setCameraOpen(false);
+    setCameraError('');
+  };
+
+  const openCamera = async () => {
+    setCameraError('');
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError('Camera is not supported in this browser.');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+        audio: false,
+      });
+      streamRef.current = stream;
+      setCameraOpen(true);
+      requestAnimationFrame(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      });
+    } catch {
+      setCameraError('Unable to access camera. Please allow permission and try again.');
+    }
+  };
+
+  const capturePhoto = async () => {
+    const video = videoRef.current;
+    if (!video || video.videoWidth === 0 || video.videoHeight === 0) {
+      setCameraError('Camera not ready yet. Please try again.');
+      return;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext('2d');
+    if (!context) {
+      setCameraError('Unable to capture image.');
+      return;
+    }
+
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((result) => resolve(result), 'image/jpeg', 0.95);
+    });
+
+    if (!blob) {
+      setCameraError('Capture failed. Please try again.');
+      return;
+    }
+
+    const file = new File([blob], `capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
+    setSingleFile(file);
+    closeCamera();
+  };
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, []);
 
   const handleSubmit = async () => {
     setStatus('');
@@ -129,6 +206,12 @@ export function AddItemScreen({ onNavigate }: AddItemScreenProps) {
                   className="px-5 py-2 rounded-xl bg-sage text-white caption font-semibold"
                 >
                   {singleFile ? 'Change Photo' : 'Upload Photo'}
+                </button>
+                <button
+                  onClick={openCamera}
+                  className="px-5 py-2 rounded-xl bg-white border border-sand text-charcoal caption font-semibold"
+                >
+                  Capture Photo
                 </button>
                 <input
                   ref={singleRef}
@@ -238,6 +321,56 @@ export function AddItemScreen({ onNavigate }: AddItemScreenProps) {
           <Camera className="w-5 h-5" />
         </motion.button>
       </div>
+
+      {cameraOpen && (
+        <div className="fixed inset-0 z-50 bg-charcoal/70 flex items-center justify-center px-4">
+          <div className="w-full max-w-md rounded-2xl bg-ivory p-4 shadow-xl">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-charcoal">Capture Garment Photo</h3>
+              <button
+                onClick={closeCamera}
+                className="w-9 h-9 rounded-full border border-sand flex items-center justify-center"
+                aria-label="Close camera"
+              >
+                <X className="w-5 h-5 text-charcoal" />
+              </button>
+            </div>
+
+            <div className="rounded-xl overflow-hidden bg-black mb-4 aspect-[3/4]">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={closeCamera}
+                className="py-3 rounded-xl border border-sand bg-white text-charcoal font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={capturePhoto}
+                className="py-3 rounded-xl bg-sage text-white font-semibold"
+              >
+                Use This Photo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cameraError && !cameraOpen && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40">
+          <div className="px-4 py-2 rounded-xl bg-white border border-sand shadow text-sm text-charcoal">
+            {cameraError}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
