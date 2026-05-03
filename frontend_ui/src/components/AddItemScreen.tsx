@@ -156,7 +156,7 @@ export function AddItemScreen({ onNavigate }: AddItemScreenProps) {
   };
 
   return (
-    <div className="min-h-screen bg-ivory pb-20">
+    <div className="min-h-screen bg-ivory pb-24">
       <div className="px-6 pt-12 pb-6">
         <div className="flex items-center justify-between mb-6">
           <button onClick={() => onNavigate('home')} className="p-2 -ml-2">
@@ -187,11 +187,11 @@ export function AddItemScreen({ onNavigate }: AddItemScreenProps) {
         </div>
       </div>
 
-      <div className="px-6 space-y-6">
+      <div className="px-6 space-y-7">
         {mode === 'single' ? (
           <>
             <div className="p-5 rounded-3xl bg-sand">
-              <div className="aspect-[3/4] rounded-2xl bg-white flex flex-col items-center justify-center gap-4">
+              <div className="aspect-[3/4] rounded-2xl bg-white flex flex-col items-center justify-center gap-4 px-4 py-5">
                 {singleFile ? (
                   <img
                     src={URL.createObjectURL(singleFile)}
@@ -218,8 +218,14 @@ export function AddItemScreen({ onNavigate }: AddItemScreenProps) {
                   type="file"
                   accept="image/*"
                   className="hidden"
+                  style={{ display: 'none' }}
                   onChange={(e) => setSingleFile(e.target.files?.[0] || null)}
                 />
+                <div className="w-full text-center">
+                  <p className="caption text-charcoal/60 truncate px-2">
+                    {singleFile ? singleFile.name : 'No photo selected'}
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -269,8 +275,16 @@ export function AddItemScreen({ onNavigate }: AddItemScreenProps) {
                   accept="image/*"
                   multiple
                   className="hidden"
+                  style={{ display: 'none' }}
                   onChange={(e) => setBulkFiles(Array.from(e.target.files || []))}
                 />
+                <div className="w-full text-center">
+                  <p className="caption text-charcoal/60 truncate px-2">
+                    {bulkFiles.length > 0
+                      ? `${bulkFiles.length} file${bulkFiles.length > 1 ? 's' : ''} selected`
+                      : 'No files selected'}
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -309,13 +323,13 @@ export function AddItemScreen({ onNavigate }: AddItemScreenProps) {
         )}
       </div>
 
-      <div className="px-6 pb-10 pt-6">
+      <div className="px-6 pb-12 pt-10">
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={handleSubmit}
           disabled={saving}
-          className="w-full py-5 mt-4 rounded-2xl bg-sage text-white font-semibold shadow-lg shadow-sage/20 flex items-center justify-center gap-2"
+          className="w-full py-4 rounded-2xl bg-sage text-white font-semibold shadow-lg shadow-sage/20 flex items-center justify-center gap-2"
         >
           {saving ? 'Processing...' : mode === 'single' ? 'Analyze Item' : 'Analyze Bulk Items'}
           <Camera className="w-5 h-5" />

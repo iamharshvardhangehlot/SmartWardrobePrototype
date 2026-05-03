@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { ArrowLeft, Recycle, Package, Heart, MapPin, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Recycle, Package, Heart, MapPin, ArrowRight, Trash2 } from 'lucide-react';
 import { Screen } from '../App';
 import { useEffect, useState } from 'react';
 import { apiPost } from '../lib/api';
@@ -7,6 +7,7 @@ import { apiPost } from '../lib/api';
 interface EndOfLifeProps {
   onNavigate: (screen: Screen) => void;
   garmentId: number | null;
+  onGarmentDeleted: () => void;
 }
 
 const options = [
@@ -61,11 +62,13 @@ type GarmentDetail = {
   image_url?: string;
 };
 
-export function EndOfLife({ onNavigate, garmentId }: EndOfLifeProps) {
+export function EndOfLife({ onNavigate, garmentId, onGarmentDeleted }: EndOfLifeProps) {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [garment, setGarment] = useState<GarmentDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     if (!garmentId) {
@@ -103,6 +106,30 @@ export function EndOfLife({ onNavigate, garmentId }: EndOfLifeProps) {
       }
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteFromCloset = async () => {
+    if (!garmentId || deleting) return;
+    const confirmed = window.confirm(
+      'Delete this garment from your closet permanently? This cannot be undone.'
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      const response = await apiPost(`/api/garments/${garmentId}/delete/`, {});
+      const payload = await response.json();
+      if (response.ok && payload.status === 'success') {
+        onGarmentDeleted();
+        return;
+      }
+      setDeleteError('Unable to delete this garment right now.');
+    } catch {
+      setDeleteError('Unable to delete this garment right now.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -305,6 +332,20 @@ export function EndOfLife({ onNavigate, garmentId }: EndOfLifeProps) {
                   Keep Item
                 </motion.button>
               </>
+            )}
+
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleDeleteFromCloset}
+              disabled={!garmentId || deleting}
+              className="w-full py-4 rounded-2xl bg-white border-2 border-terracotta/40 text-terracotta font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
+            >
+              <Trash2 className="w-5 h-5" />
+              {deleting ? 'Deleting...' : 'Delete from the closet'}
+            </motion.button>
+            {deleteError && (
+              <p className="caption text-terracotta text-center">{deleteError}</p>
             )}
           </div>
         </>

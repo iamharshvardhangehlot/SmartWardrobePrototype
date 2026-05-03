@@ -1838,6 +1838,32 @@ body.theme-dark .app-scroll {
   scrollbar-color: rgba(230, 231, 234, 0.2) transparent;
 }
 
+/* Visible scrollbar for outfit picker modal list (desktop + laptop) */
+.picker-scroll {
+  scrollbar-gutter: stable;
+  scrollbar-width: auto;
+  scrollbar-color: rgba(123, 174, 142, 0.95) rgba(20, 27, 34, 0.65);
+}
+
+.picker-scroll::-webkit-scrollbar {
+  width: 11px;
+}
+
+.picker-scroll::-webkit-scrollbar-track {
+  background: rgba(20, 27, 34, 0.65);
+  border-radius: 999px;
+}
+
+.picker-scroll::-webkit-scrollbar-thumb {
+  background: rgba(123, 174, 142, 0.95);
+  border-radius: 999px;
+  border: 2px solid rgba(20, 27, 34, 0.65);
+}
+
+.picker-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(123, 174, 142, 1);
+}
+
 body.theme-dark .bg-ivory {
   background-color: #0b0f14;
   background-image:

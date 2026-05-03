@@ -11,10 +11,11 @@ interface VirtualTryOnScreenProps {
 }
 
 const angleMap: Record<string, string> = {
-  Front: '0deg 75deg 2.5m',
-  Back: '180deg 75deg 2.5m',
-  Left: '-90deg 75deg 2.5m',
-  Right: '90deg 75deg 2.5m',
+  // Model's native forward axis is flipped from UI semantics, so we offset yaw.
+  Front: '180deg 75deg 2.5m',
+  Back: '0deg 75deg 2.5m',
+  Left: '90deg 75deg 2.5m',
+  Right: '-90deg 75deg 2.5m',
 };
 
 export function VirtualTryOnScreen({       
@@ -249,6 +250,7 @@ export function VirtualTryOnScreen({
         {/* View Angles */}
         <div>
           <label className="microtext text-charcoal/60 mb-3 block">VIEW ANGLE</label>
+          {/*
           <div className="grid grid-cols-4 gap-2">
             {['Front', 'Back', 'Left', 'Right'].map((view) => (
               <button
@@ -264,6 +266,7 @@ export function VirtualTryOnScreen({
               </button>
             ))}
           </div>
+          */}
         </div>
 
         {/* Outfit Layers */}

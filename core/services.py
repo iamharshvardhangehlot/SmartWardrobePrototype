@@ -1,4 +1,5 @@
 import logging
+import io
 import os
 import random
 from datetime import datetime
@@ -60,6 +61,62 @@ class GarmentService:
     """Garment creation and AI enrichment."""
 
     @staticmethod
+    def _normalize_image_bytes(image_file):
+        try:
+            from PIL import Image, ImageOps
+
+            image_file.seek(0)
+            with Image.open(image_file) as img:
+                img = ImageOps.exif_transpose(img)
+                if img.mode not in ("RGB", "RGBA"):
+                    img = img.convert("RGB")
+                output = io.BytesIO()
+                img.save(output, format="PNG")
+                return output.getvalue()
+        except Exception:
+            try:
+                image_file.seek(0)
+            except Exception:
+                pass
+            return image_file.read()
+
+    @staticmethod
+    def _trim_transparent_bounds(image_bytes):
+        try:
+            from PIL import Image
+
+            with Image.open(io.BytesIO(image_bytes)).convert("RGBA") as img:
+                alpha = img.getchannel("A")
+                # rembg can leave very low-alpha noise across the canvas;
+                # ignore it so we crop to the real garment silhouette.
+                threshold = 8
+                mask = alpha.point(lambda value: 255 if value >= threshold else 0)
+                bbox = mask.getbbox() or alpha.getbbox()
+                if not bbox:
+                    return image_bytes
+
+                left, top, right, bottom = bbox
+                width, height = img.size
+                crop_w = right - left
+                crop_h = bottom - top
+
+                # Add a small breathing-space padding around the detected garment.
+                pad_x = max(8, int(crop_w * 0.04))
+                pad_y = max(8, int(crop_h * 0.04))
+
+                left = max(0, left - pad_x)
+                top = max(0, top - pad_y)
+                right = min(width, right + pad_x)
+                bottom = min(height, bottom + pad_y)
+
+                cropped = img.crop((left, top, right, bottom))
+                output = io.BytesIO()
+                cropped.save(output, format="PNG")
+                return output.getvalue()
+        except Exception:
+            return image_bytes
+
+    @staticmethod
     def _remove_background(image_file):
         if os.getenv("DISABLE_REMBG", "").lower() in {"1", "true", "yes"}:
             logger.info("DISABLE_REMBG set; skipping background removal.")
@@ -74,8 +131,9 @@ class GarmentService:
             logger.warning("rembg is unavailable; skipping background removal.")
             return None
         try:
-            input_bytes = image_file.read()
+            input_bytes = GarmentService._normalize_image_bytes(image_file)
             output_bytes = remove(input_bytes)
+            output_bytes = GarmentService._trim_transparent_bounds(output_bytes)
             return output_bytes
         except Exception:
             logger.exception("Background removal failed.")

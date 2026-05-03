@@ -2,6 +2,7 @@ import { motion } from 'motion/react';
 import { ArrowLeft, Lock, Unlock, RefreshCw, Sparkles, Info, X } from 'lucide-react';
 import { Screen, OutfitSelection, GarmentSummary } from '../App';
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { apiPost } from '../lib/api';
 import { BottomNav } from './BottomNav';
 
@@ -42,6 +43,12 @@ export function AIOutfitRecommendation({
   const [advancedEnabled, setAdvancedEnabled] = useState(false);
   const [showAdvancedInfo, setShowAdvancedInfo] = useState(false);
   const [picker, setPicker] = useState<'top' | 'bottom' | null>(null);
+  const [pickerShellRect, setPickerShellRect] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const [topFilter, setTopFilter] = useState('all');
   const [bottomFilter, setBottomFilter] = useState('all');
   const [wearStatus, setWearStatus] = useState('');
@@ -150,6 +157,45 @@ export function AIOutfitRecommendation({
     };
   }, [showAdvancedInfo]);
 
+  useEffect(() => {
+    const appScroll = document.querySelector('.app-scroll') as HTMLElement | null;
+    if (!appScroll) return;
+    const previousOverflow = appScroll.style.overflowY;
+    if (picker) {
+      appScroll.style.overflowY = 'hidden';
+    }
+    return () => {
+      appScroll.style.overflowY = previousOverflow || 'auto';
+    };
+  }, [picker]);
+
+  useEffect(() => {
+    if (!picker) {
+      setPickerShellRect(null);
+      return;
+    }
+
+    const updateRect = () => {
+      const shell = document.querySelector('.app-shell') as HTMLElement | null;
+      if (!shell) return;
+      const rect = shell.getBoundingClientRect();
+      setPickerShellRect({
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
+      });
+    };
+
+    updateRect();
+    window.addEventListener('resize', updateRect);
+    window.addEventListener('scroll', updateRect, true);
+    return () => {
+      window.removeEventListener('resize', updateRect);
+      window.removeEventListener('scroll', updateRect, true);
+    };
+  }, [picker]);
+
   const handleShuffle = () => {
     if (!outfitSelection.lock_top && !outfitSelection.lock_bottom) {
       setTopLocked(false);
@@ -235,7 +281,7 @@ export function AIOutfitRecommendation({
   };
 
   return (
-    <div className="min-h-screen bg-ivory pb-20">
+    <div className="relative min-h-screen bg-ivory pb-20">
       <div className="px-6 pt-12 pb-6">
         <div className="flex items-center justify-between mb-6">
           <button onClick={() => onNavigate('home')} className="p-2 -ml-2">
@@ -420,103 +466,116 @@ export function AIOutfitRecommendation({
         </motion.button>
       </div>
 
-      {picker && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
-          onClick={() => setPicker(null)}
-        >
+      {picker && pickerShellRect &&
+        createPortal(
           <div
-            className="w-[92vw] max-w-md rounded-3xl bg-ivory p-4 shadow-xl flex flex-col overflow-hidden"
-            style={{ height: '70vh', minHeight: '70vh', maxHeight: '70vh' }}
-            onClick={(event) => event.stopPropagation()}
+            className="fixed z-[60] p-3 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+            style={{
+              top: pickerShellRect.top,
+              left: pickerShellRect.left,
+              width: pickerShellRect.width,
+              height: pickerShellRect.height,
+            }}
+            onClick={() => setPicker(null)}
           >
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-base font-semibold">
-                {picker === 'top' ? 'Choose Top' : 'Choose Bottom'}
-              </h3>
-              <button onClick={() => setPicker(null)} className="p-2 rounded-full bg-white border border-sand">
-                <X className="w-4 h-4 text-charcoal/70" />
-              </button>
-            </div>
+            <div
+              className="w-full max-w-md rounded-3xl bg-ivory p-4 shadow-xl flex flex-col min-h-0 overflow-hidden"
+              style={{
+                height: `min(${Math.round(pickerShellRect.height * 0.78)}px, 42rem)`,
+                maxHeight: `calc(${Math.round(pickerShellRect.height)}px - 1.5rem)`,
+              }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="picker-scroll min-h-0 flex-1 overflow-y-scroll overscroll-contain pr-1">
+                <div className="sticky top-0 z-10 bg-ivory pb-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-base font-semibold">
+                      {picker === 'top' ? 'Choose Top' : 'Choose Bottom'}
+                    </h3>
+                    <button onClick={() => setPicker(null)} className="p-2 rounded-full bg-white border border-sand">
+                      <X className="w-4 h-4 text-charcoal/70" />
+                    </button>
+                  </div>
 
-            <div className="flex flex-wrap gap-2 mb-3">
-              {(picker === 'top'
-                ? [
-                    { label: 'All', value: 'all' },
-                    { label: 'Graphic', value: 'graphic' },
-                    { label: 'Solid', value: 'solid' },
-                    { label: 'Shirts', value: 'shirt' },
-                    { label: 'Jackets', value: 'jacket' },
-                  ]
-                : [
-                    { label: 'All', value: 'all' },
-                    { label: 'Pants', value: 'pants' },
-                    { label: 'Shorts', value: 'shorts' },
-                    { label: 'Jeans', value: 'jeans' },
-                    { label: 'Solid', value: 'solid' },
-                  ]
-              ).map((filter) => {
-                const active = picker === 'top' ? topFilter === filter.value : bottomFilter === filter.value;
-                return (
-                  <button
-                    key={filter.value}
-                    onClick={() =>
-                      picker === 'top' ? setTopFilter(filter.value) : setBottomFilter(filter.value)
-                    }
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap ${
-                      active ? 'bg-sage text-white' : 'bg-white border border-sand text-charcoal/70'
-                    }`}
-                  >
-                    {filter.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="flex-1 overflow-y-auto">
-              {filterItems(
-                picker === 'top' ? topOptions : bottomOptions,
-                picker === 'top' ? topFilter : bottomFilter,
-                picker
-              ).length === 0 && (
-                <div className="p-3 rounded-2xl bg-white border border-sand text-center caption text-charcoal/60">
-                  No items found. Add more items to your wardrobe.
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {(picker === 'top'
+                      ? [
+                          { label: 'All', value: 'all' },
+                          { label: 'Graphic', value: 'graphic' },
+                          { label: 'Solid', value: 'solid' },
+                          { label: 'Shirts', value: 'shirt' },
+                          { label: 'Jackets', value: 'jacket' },
+                        ]
+                      : [
+                          { label: 'All', value: 'all' },
+                          { label: 'Pants', value: 'pants' },
+                          { label: 'Shorts', value: 'shorts' },
+                          { label: 'Jeans', value: 'jeans' },
+                          { label: 'Solid', value: 'solid' },
+                        ]
+                    ).map((filter) => {
+                      const active = picker === 'top' ? topFilter === filter.value : bottomFilter === filter.value;
+                      return (
+                        <button
+                          key={filter.value}
+                          onClick={() =>
+                            picker === 'top' ? setTopFilter(filter.value) : setBottomFilter(filter.value)
+                          }
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap ${
+                            active ? 'bg-sage text-white' : 'bg-white border border-sand text-charcoal/70'
+                          }`}
+                        >
+                          {filter.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              )}
-              <div className="grid grid-cols-4 gap-2">
+
                 {filterItems(
                   picker === 'top' ? topOptions : bottomOptions,
                   picker === 'top' ? topFilter : bottomFilter,
                   picker
-                ).map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => handleCustomPick(item, picker as 'top' | 'bottom')}
-                    className="rounded-2xl bg-white border border-sand overflow-hidden text-left"
-                  >
-                    <div className="aspect-square bg-sand/70 flex items-center justify-center p-2">
-                      {item.image_url ? (
-                        <img
-                          src={item.image_url}
-                          alt={item.name}
-                          className="max-h-full max-w-full object-contain"
-                        />
-                      ) : (
-                        <span className="text-xs text-charcoal/40">?</span>
-                      )}
-                    </div>
-                    <div className="p-2">
-                      <div className="text-[10px] font-semibold leading-tight line-clamp-2 min-h-[28px]">
-                        {item.name}
+                ).length === 0 && (
+                  <div className="p-3 rounded-2xl bg-white border border-sand text-center caption text-charcoal/60">
+                    No items found. Add more items to your wardrobe.
+                  </div>
+                )}
+                <div className="grid grid-cols-4 gap-2">
+                  {filterItems(
+                    picker === 'top' ? topOptions : bottomOptions,
+                    picker === 'top' ? topFilter : bottomFilter,
+                    picker
+                  ).map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => handleCustomPick(item, picker as 'top' | 'bottom')}
+                      className="rounded-2xl bg-white border border-sand overflow-hidden text-left"
+                    >
+                      <div className="aspect-square bg-sand/70 flex items-center justify-center p-2">
+                        {item.image_url ? (
+                          <img
+                            src={item.image_url}
+                            alt={item.name}
+                            className="max-h-full max-w-full object-contain"
+                          />
+                        ) : (
+                          <span className="text-xs text-charcoal/40">?</span>
+                        )}
                       </div>
-                    </div>
-                  </button>
-                ))}
+                      <div className="p-2">
+                        <div className="text-[10px] font-semibold leading-tight line-clamp-2 min-h-[28px]">
+                          {item.name}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
 
       <BottomNav current="ai-outfit" onNavigate={onNavigate} />
     </div>

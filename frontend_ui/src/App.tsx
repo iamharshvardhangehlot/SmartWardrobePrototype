@@ -191,6 +191,10 @@ export default function App() {
           <EndOfLife
             onNavigate={setCurrentScreen}
             garmentId={selectedGarmentId}
+            onGarmentDeleted={() => {
+              setSelectedGarmentId(null);
+              setCurrentScreen('wardrobe');
+            }}
           />
         );
       case 'settings':

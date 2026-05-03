@@ -1,5 +1,6 @@
 from datetime import datetime
 import json
+import os
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
@@ -391,6 +392,17 @@ def _map_color_group(color_hex):
     return "Neutral"
 
 
+def _image_url_with_version(image_field):
+    if not image_field:
+        return ""
+    url = image_field.url
+    try:
+        version = int(os.path.getmtime(image_field.path))
+        return f"{url}?v={version}"
+    except Exception:
+        return url
+
+
 def api_wardrobe(request):
     if not request.user.is_authenticated:
         return JsonResponse({"status": "error", "message": "Unauthorized"}, status=401)
@@ -432,7 +444,7 @@ def api_wardrobe(request):
                 "id": garment.id,
                 "name": garment.name,
                 "category": garment.category,
-                "image_url": garment.image.url if garment.image else "",
+                "image_url": _image_url_with_version(garment.image),
                 "wear_count": garment.wear_count,
                 "cost_per_wear": float(garment.cost_per_wear),
                 "color_hex": garment.color_hex,
@@ -476,7 +488,7 @@ def api_garment_detail(request, garment_id):
                 "id": garment.id,
                 "name": garment.name,
                 "category": garment.category,
-                "image_url": garment.image.url if garment.image else "",
+                "image_url": _image_url_with_version(garment.image),
                 "purchase_price": float(garment.purchase_price or 0),
                 "wear_count": garment.wear_count,
                 "cost_per_wear": float(garment.cost_per_wear),
@@ -492,6 +504,22 @@ def api_garment_detail(request, garment_id):
             },
         }
     )
+
+
+@require_http_methods(["POST"])
+def api_garment_delete(request, garment_id):
+    if not request.user.is_authenticated:
+        return JsonResponse({"status": "error", "message": "Unauthorized"}, status=401)
+
+    garment = get_object_or_404(Garment, id=garment_id, owner=request.user)
+    garment_pk = garment.id
+    with transaction.atomic():
+        if garment.image:
+            garment.image.delete(save=False)
+        if garment.vton_processed_image:
+            garment.vton_processed_image.delete(save=False)
+        garment.delete()
+    return JsonResponse({"status": "success", "deleted_id": garment_pk})
 
 
 def api_outfit(request):
@@ -773,8 +801,15 @@ def api_discard(request):
     if not request.user.is_authenticated:
         return JsonResponse({"status": "error", "message": "Unauthorized"}, status=401)
 
-    garment_id = request.POST.get("garment_id")
-    method = request.POST.get("method")
+    data = request.POST
+    if request.content_type and "application/json" in request.content_type:
+        try:
+            data = json.loads(request.body.decode("utf-8") or "{}")
+        except Exception:
+            data = {}
+
+    garment_id = data.get("garment_id")
+    method = data.get("method")
     if not garment_id or not method:
         return JsonResponse({"status": "error", "message": "Missing data"}, status=400)
 
