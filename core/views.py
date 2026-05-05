@@ -31,6 +31,18 @@ from .services import (
 from .utils import get_season_details
 
 
+def _set_onboarded_cookie(response):
+    # Keep existing users on dashboard flow instead of onboarding.
+    response.set_cookie(
+        "sw_onboarded",
+        "1",
+        max_age=60 * 60 * 24 * 365 * 5,  # 5 years
+        path="/",
+        samesite="Lax",
+    )
+    return response
+
+
 def try_on_outfit(request):
     if request.method != "POST":
         return JsonResponse({"status": "error"}, status=400)
@@ -151,13 +163,15 @@ def react_app(request):
     if not request.user.is_authenticated:
         next_url = request.get_full_path() or "/app/"
         return redirect(f"/login/?next={next_url}")
-    return render(request, "react_index.html")
+    response = render(request, "react_index.html")
+    return _set_onboarded_cookie(response)
 
 
 @require_http_methods(["GET", "POST"])
 def login_view(request):
     if request.user.is_authenticated:
-        return redirect(request.GET.get("next") or "/app/")
+        response = redirect(request.GET.get("next") or "/app/")
+        return _set_onboarded_cookie(response)
 
     error = None
     if request.method == "POST":
@@ -166,7 +180,8 @@ def login_view(request):
         user = authenticate(request, username=username, password=password)
         if user:
             login(request, user)
-            return redirect(request.POST.get("next") or "/app/")
+            response = redirect(request.POST.get("next") or "/app/")
+            return _set_onboarded_cookie(response)
         error = "Invalid username or password."
 
     return render(
