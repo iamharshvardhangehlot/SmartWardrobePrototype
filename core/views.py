@@ -43,6 +43,14 @@ def _set_onboarded_cookie(response):
     return response
 
 
+def _is_custom_lens_selection_enabled():
+    return os.getenv("ENABLE_CUSTOM_LENS_SELECTION", "0").lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+
+
 def try_on_outfit(request):
     if request.method != "POST":
         return JsonResponse({"status": "error"}, status=400)
@@ -163,7 +171,13 @@ def react_app(request):
     if not request.user.is_authenticated:
         next_url = request.get_full_path() or "/app/"
         return redirect(f"/login/?next={next_url}")
-    response = render(request, "react_index.html")
+    response = render(
+        request,
+        "react_index.html",
+        {
+            "enable_custom_lens_selection": _is_custom_lens_selection_enabled(),
+        },
+    )
     return _set_onboarded_cookie(response)
 
 

@@ -9,6 +9,11 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      window.__SW_FEATURES__ = {
+        customLensSelection: {{ enable_custom_lens_selection|yesno:"true,false" }},
+      };
+    </script>
     {% vite_asset "index.html" %}
   </body>
 </html>

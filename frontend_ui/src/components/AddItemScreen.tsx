@@ -22,6 +22,49 @@ const fabricOptions = [
   'Other',
 ];
 
+type CameraModuleKind = 'ultra-wide' | 'wide' | 'main' | 'tele' | 'rear';
+
+type CameraModuleOption = {
+  deviceId: string;
+  label: string;
+  kind: CameraModuleKind;
+};
+
+const isFrontCameraLabel = (label: string) => {
+  const text = (label || '').toLowerCase();
+  return /front|user|selfie|facetime/.test(text);
+};
+
+const detectCameraKind = (label: string): CameraModuleKind => {
+  const text = (label || '').toLowerCase();
+  if (/ultra|0\.5|0,5/.test(text)) return 'ultra-wide';
+  if (/wide/.test(text)) return 'wide';
+  if (/tele|zoom/.test(text)) return 'tele';
+  if (/main|back|rear|standard|1x|1\.0|1,0/.test(text)) return 'main';
+  return 'rear';
+};
+
+const cameraKindPriority: Record<CameraModuleKind, number> = {
+  'ultra-wide': 1,
+  wide: 2,
+  main: 3,
+  rear: 4,
+  tele: 5,
+};
+
+const cameraKindLabel: Record<CameraModuleKind, string> = {
+  'ultra-wide': 'Ultra-Wide (0.5x)',
+  wide: 'Wide',
+  main: 'Main (1x)',
+  rear: 'Rear Camera',
+  tele: 'Telephoto',
+};
+
+const isCustomLensSelectionEnabled = () => {
+  const flags = (window as any).__SW_FEATURES__ || {};
+  return !!flags.customLensSelection;
+};
+
 export function AddItemScreen({ onNavigate }: AddItemScreenProps) {
   const [mode, setMode] = useState<'single' | 'bulk'>('single');
   const [singleFile, setSingleFile] = useState<File | null>(null);
@@ -34,6 +77,10 @@ export function AddItemScreen({ onNavigate }: AddItemScreenProps) {
   const [saving, setSaving] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState('');
+  const [customLensSelectionEnabled] = useState(() => isCustomLensSelectionEnabled());
+  const [cameraModules, setCameraModules] = useState<CameraModuleOption[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState('');
+  const [switchingCamera, setSwitchingCamera] = useState(false);
   const singleRef = useRef<HTMLInputElement>(null);
   const bulkRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -52,6 +99,72 @@ export function AddItemScreen({ onNavigate }: AddItemScreenProps) {
     setCameraError('');
   };
 
+  const startCameraStream = async (deviceId?: string) => {
+    const constraints: MediaStreamConstraints = {
+      video: deviceId
+        ? {
+            deviceId: { exact: deviceId },
+          }
+        : {
+            facingMode: { ideal: 'environment' },
+          },
+      audio: false,
+    };
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    stopCamera();
+    streamRef.current = stream;
+    requestAnimationFrame(() => {
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    });
+    return stream;
+  };
+
+  const loadCameraModules = async (): Promise<CameraModuleOption[]> => {
+    if (!navigator.mediaDevices?.enumerateDevices) return [];
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videos = devices.filter((device) => device.kind === 'videoinput');
+    const hasLabels = videos.some((device) => (device.label || '').trim().length > 0);
+    const rearCandidates = hasLabels
+      ? videos.filter((device) => !isFrontCameraLabel(device.label || ''))
+      : videos;
+    const source = rearCandidates.length > 0 ? rearCandidates : videos;
+
+    return source.map((device, index) => {
+      const label = (device.label || '').trim();
+      const kind = detectCameraKind(label);
+      const fallback = `${cameraKindLabel[kind]} ${index + 1}`;
+      return {
+        deviceId: device.deviceId,
+        label: label || fallback,
+        kind,
+      };
+    });
+  };
+
+  const pickPreferredCamera = (modules: CameraModuleOption[]) => {
+    if (modules.length === 0) return '';
+    const sorted = [...modules].sort(
+      (a, b) => cameraKindPriority[a.kind] - cameraKindPriority[b.kind]
+    );
+    return sorted[0].deviceId;
+  };
+
+  const switchCamera = async (deviceId: string) => {
+    if (!deviceId || switchingCamera) return;
+    setCameraError('');
+    setSwitchingCamera(true);
+    try {
+      await startCameraStream(deviceId);
+      setSelectedCameraId(deviceId);
+    } catch {
+      setCameraError('Unable to switch camera module. Please try another one.');
+    } finally {
+      setSwitchingCamera(false);
+    }
+  };
+
   const openCamera = async () => {
     setCameraError('');
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -59,17 +172,25 @@ export function AddItemScreen({ onNavigate }: AddItemScreenProps) {
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
-        audio: false,
-      });
-      streamRef.current = stream;
+      await startCameraStream();
       setCameraOpen(true);
-      requestAnimationFrame(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
+      if (!customLensSelectionEnabled) {
+        setCameraModules([]);
+        setSelectedCameraId('');
+        return;
+      }
+      const modules = await loadCameraModules();
+      setCameraModules(modules);
+
+      const preferredId = pickPreferredCamera(modules);
+      if (preferredId) {
+        setSelectedCameraId(preferredId);
+        const currentTrack = streamRef.current?.getVideoTracks()[0];
+        const currentId = currentTrack?.getSettings?.().deviceId || '';
+        if (currentId !== preferredId) {
+          await switchCamera(preferredId);
         }
-      });
+      }
     } catch {
       setCameraError('Unable to access camera. Please allow permission and try again.');
     }
@@ -359,6 +480,35 @@ export function AddItemScreen({ onNavigate }: AddItemScreenProps) {
                 className="w-full h-full object-cover"
               />
             </div>
+
+            {customLensSelectionEnabled && cameraModules.length > 0 && (
+              <div className="mb-4">
+                <div className="microtext text-charcoal/60 mb-2">Camera Module</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {cameraModules.map((module) => {
+                    const active = selectedCameraId === module.deviceId;
+                    return (
+                      <button
+                        key={module.deviceId}
+                        type="button"
+                        disabled={switchingCamera}
+                        onClick={() => switchCamera(module.deviceId)}
+                        className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                          active
+                            ? 'bg-sage text-white'
+                            : 'bg-white border border-sand text-charcoal/70'
+                        } ${switchingCamera ? 'opacity-70' : ''}`}
+                      >
+                        {cameraKindLabel[module.kind]}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="caption text-charcoal/60 mt-2">
+                  Ultra-wide (0.5x) is auto-selected when available.
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <button
