@@ -22,12 +22,15 @@ const fabricOptions = [
   'Other',
 ];
 
-type CameraModuleKind = 'ultra-wide' | 'wide' | 'main' | 'tele' | 'rear';
+type CameraModuleKind = 'ultra-wide' | 'wide' | 'main' | 'tele' | 'rear' | 'front';
 
 type CameraModuleOption = {
+  key: string;
   deviceId: string;
   label: string;
   kind: CameraModuleKind;
+  source: 'device' | 'zoom';
+  zoomLevel?: number;
 };
 
 const isFrontCameraLabel = (label: string) => {
@@ -37,6 +40,7 @@ const isFrontCameraLabel = (label: string) => {
 
 const detectCameraKind = (label: string): CameraModuleKind => {
   const text = (label || '').toLowerCase();
+  if (isFrontCameraLabel(text)) return 'front';
   if (/ultra|0\.5|0,5/.test(text)) return 'ultra-wide';
   if (/wide/.test(text)) return 'wide';
   if (/tele|zoom/.test(text)) return 'tele';
@@ -50,6 +54,7 @@ const cameraKindPriority: Record<CameraModuleKind, number> = {
   main: 3,
   rear: 4,
   tele: 5,
+  front: 6,
 };
 
 const cameraKindLabel: Record<CameraModuleKind, string> = {
@@ -58,6 +63,7 @@ const cameraKindLabel: Record<CameraModuleKind, string> = {
   main: 'Main (1x)',
   rear: 'Rear Camera',
   tele: 'Telephoto',
+  front: 'Front Camera',
 };
 
 const isCustomLensSelectionEnabled = () => {
@@ -79,7 +85,7 @@ export function AddItemScreen({ onNavigate }: AddItemScreenProps) {
   const [cameraError, setCameraError] = useState('');
   const [customLensSelectionEnabled] = useState(() => isCustomLensSelectionEnabled());
   const [cameraModules, setCameraModules] = useState<CameraModuleOption[]>([]);
-  const [selectedCameraId, setSelectedCameraId] = useState('');
+  const [selectedCameraKey, setSelectedCameraKey] = useState('');
   const [switchingCamera, setSwitchingCamera] = useState(false);
   const singleRef = useRef<HTMLInputElement>(null);
   const bulkRef = useRef<HTMLInputElement>(null);
@@ -97,6 +103,9 @@ export function AddItemScreen({ onNavigate }: AddItemScreenProps) {
     stopCamera();
     setCameraOpen(false);
     setCameraError('');
+    setCameraModules([]);
+    setSelectedCameraKey('');
+    setSwitchingCamera(false);
   };
 
   const startCameraStream = async (deviceId?: string) => {
@@ -121,43 +130,110 @@ export function AddItemScreen({ onNavigate }: AddItemScreenProps) {
     return stream;
   };
 
-  const loadCameraModules = async (): Promise<CameraModuleOption[]> => {
+  const loadCameraModules = async (
+    track: MediaStreamTrack | null
+  ): Promise<CameraModuleOption[]> => {
     if (!navigator.mediaDevices?.enumerateDevices) return [];
     const devices = await navigator.mediaDevices.enumerateDevices();
     const videos = devices.filter((device) => device.kind === 'videoinput');
-    const hasLabels = videos.some((device) => (device.label || '').trim().length > 0);
-    const rearCandidates = hasLabels
-      ? videos.filter((device) => !isFrontCameraLabel(device.label || ''))
-      : videos;
-    const source = rearCandidates.length > 0 ? rearCandidates : videos;
-
-    return source.map((device, index) => {
+    const modules = videos.map((device, index) => {
       const label = (device.label || '').trim();
       const kind = detectCameraKind(label);
       const fallback = `${cameraKindLabel[kind]} ${index + 1}`;
       return {
+        key: `device:${device.deviceId}`,
         deviceId: device.deviceId,
         label: label || fallback,
         kind,
+        source: 'device' as const,
       };
     });
+
+    // Some Android browsers expose one logical rear camera. If zoom capabilities
+    // include sub-1x, add virtual lens options (0.6x/0.5x etc.) on that track.
+    if (track && typeof (track as any).getCapabilities === 'function') {
+      const capabilities = (track as any).getCapabilities?.() || {};
+      const settings = track.getSettings ? track.getSettings() : ({} as any);
+      const currentDeviceId = settings.deviceId || '';
+      const zoom = capabilities.zoom;
+      if (
+        zoom &&
+        typeof zoom.min === 'number' &&
+        typeof zoom.max === 'number' &&
+        zoom.max > zoom.min
+      ) {
+        const zoomOptions: CameraModuleOption[] = [];
+        if (zoom.min < 0.95) {
+          const ultra = Number(zoom.min.toFixed(2));
+          zoomOptions.push({
+            key: `zoom:${ultra}`,
+            deviceId: currentDeviceId,
+            label: `Ultra-Wide (${ultra}x)`,
+            kind: 'ultra-wide',
+            source: 'zoom',
+            zoomLevel: ultra,
+          });
+        }
+        if (zoom.min <= 1 && zoom.max >= 1) {
+          zoomOptions.push({
+            key: 'zoom:1',
+            deviceId: currentDeviceId,
+            label: 'Main (1x)',
+            kind: 'main',
+            source: 'zoom',
+            zoomLevel: 1,
+          });
+        }
+        if (zoom.max >= 1.8) {
+          const tele = Number(Math.min(2, zoom.max).toFixed(2));
+          zoomOptions.push({
+            key: `zoom:${tele}`,
+            deviceId: currentDeviceId,
+            label: `Telephoto (${tele}x)`,
+            kind: 'tele',
+            source: 'zoom',
+            zoomLevel: tele,
+          });
+        }
+        if (zoomOptions.length > 0) {
+          // If browser already exposed multiple physical modules, prefer those.
+          // Otherwise use virtual zoom-lens options for better control.
+          const distinctDeviceCount = new Set(modules.map((m) => m.deviceId)).size;
+          if (distinctDeviceCount <= 2) {
+            return zoomOptions;
+          }
+        }
+      }
+    }
+
+    return modules;
   };
 
   const pickPreferredCamera = (modules: CameraModuleOption[]) => {
     if (modules.length === 0) return '';
-    const sorted = [...modules].sort(
+    const rearFirst = modules.filter((m) => m.kind !== 'front');
+    const source = rearFirst.length > 0 ? rearFirst : modules;
+    const sorted = [...source].sort(
       (a, b) => cameraKindPriority[a.kind] - cameraKindPriority[b.kind]
     );
-    return sorted[0].deviceId;
+    return sorted[0].key;
   };
 
-  const switchCamera = async (deviceId: string) => {
-    if (!deviceId || switchingCamera) return;
+  const switchCamera = async (module: CameraModuleOption) => {
+    if (!module || switchingCamera) return;
     setCameraError('');
     setSwitchingCamera(true);
     try {
-      await startCameraStream(deviceId);
-      setSelectedCameraId(deviceId);
+      if (module.source === 'zoom' && typeof module.zoomLevel === 'number') {
+        const track = streamRef.current?.getVideoTracks()[0];
+        if (!track) throw new Error('No active camera track');
+        await track.applyConstraints({
+          advanced: [{ zoom: module.zoomLevel as any }],
+        } as any);
+      } else {
+        await startCameraStream(module.deviceId);
+      }
+      setSelectedCameraKey(module.key);
     } catch {
       setCameraError('Unable to switch camera module. Please try another one.');
     } finally {
@@ -176,20 +252,17 @@ export function AddItemScreen({ onNavigate }: AddItemScreenProps) {
       setCameraOpen(true);
       if (!customLensSelectionEnabled) {
         setCameraModules([]);
-        setSelectedCameraId('');
+        setSelectedCameraKey('');
         return;
       }
-      const modules = await loadCameraModules();
+      const currentTrack = streamRef.current?.getVideoTracks()[0] || null;
+      const modules = await loadCameraModules(currentTrack);
       setCameraModules(modules);
 
-      const preferredId = pickPreferredCamera(modules);
-      if (preferredId) {
-        setSelectedCameraId(preferredId);
-        const currentTrack = streamRef.current?.getVideoTracks()[0];
-        const currentId = currentTrack?.getSettings?.().deviceId || '';
-        if (currentId !== preferredId) {
-          await switchCamera(preferredId);
-        }
+      const preferredKey = pickPreferredCamera(modules);
+      const preferredModule = modules.find((module) => module.key === preferredKey);
+      if (preferredModule) {
+        await switchCamera(preferredModule);
       }
     } catch {
       setCameraError('Unable to access camera. Please allow permission and try again.');
@@ -486,27 +559,28 @@ export function AddItemScreen({ onNavigate }: AddItemScreenProps) {
                 <div className="microtext text-charcoal/60 mb-2">Camera Module</div>
                 <div className="grid grid-cols-2 gap-2">
                   {cameraModules.map((module) => {
-                    const active = selectedCameraId === module.deviceId;
                     return (
                       <button
-                        key={module.deviceId}
+                        key={module.key}
                         type="button"
                         disabled={switchingCamera}
-                        onClick={() => switchCamera(module.deviceId)}
+                        onClick={() => switchCamera(module)}
                         className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                          active
+                          selectedCameraKey === module.key
                             ? 'bg-sage text-white'
                             : 'bg-white border border-sand text-charcoal/70'
                         } ${switchingCamera ? 'opacity-70' : ''}`}
                       >
-                        {cameraKindLabel[module.kind]}
+                        {module.source === 'zoom' ? module.label : cameraKindLabel[module.kind]}
                       </button>
                     );
                   })}
                 </div>
-                <div className="caption text-charcoal/60 mt-2">
-                  Ultra-wide (0.5x) is auto-selected when available.
-                </div>
+                {cameraModules.some((module) => module.kind === 'ultra-wide') && (
+                  <div className="caption text-charcoal/60 mt-2">
+                    Ultra-wide is auto-selected when available.
+                  </div>
+                )}
               </div>
             )}
 
