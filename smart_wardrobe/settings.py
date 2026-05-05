@@ -35,6 +35,24 @@ ALLOWED_HOSTS = [
     if host.strip()
 ] or ["*"]
 
+# Render/Reverse-proxy HTTPS support + CSRF origin checks.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
+
+_default_csrf_origins = [
+    "https://smartwardrobeprototype.onrender.com",
+]
+_env_csrf_origins = [
+    origin.strip()
+    for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+CSRF_TRUSTED_ORIGINS = _env_csrf_origins or _default_csrf_origins
+
+# Keep local dev easy, but secure cookies in non-debug environments.
+SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "False" if DEBUG else "True").lower() == "true"
+CSRF_COOKIE_SECURE = os.getenv("CSRF_COOKIE_SECURE", "False" if DEBUG else "True").lower() == "true"
+
 
 # Application definition
 
