@@ -1,8 +1,9 @@
 import { motion } from 'motion/react';
-import { ArrowLeft, Camera, Upload, Image as ImageIcon, X } from 'lucide-react';
+import { ArrowLeft, Camera, Upload, Image as ImageIcon } from 'lucide-react';
 import { Screen } from '../App';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { apiPost } from '../lib/api';
+import { isDemoModeEnabled } from '../lib/features';
 
 interface AddItemScreenProps {
   onNavigate: (screen: Screen) => void;
@@ -22,55 +23,6 @@ const fabricOptions = [
   'Other',
 ];
 
-type CameraModuleKind = 'ultra-wide' | 'wide' | 'main' | 'tele' | 'rear' | 'front';
-
-type CameraModuleOption = {
-  key: string;
-  deviceId: string;
-  label: string;
-  kind: CameraModuleKind;
-  source: 'device' | 'zoom';
-  zoomLevel?: number;
-};
-
-const isFrontCameraLabel = (label: string) => {
-  const text = (label || '').toLowerCase();
-  return /front|user|selfie|facetime/.test(text);
-};
-
-const detectCameraKind = (label: string): CameraModuleKind => {
-  const text = (label || '').toLowerCase();
-  if (isFrontCameraLabel(text)) return 'front';
-  if (/ultra|0\.5|0,5/.test(text)) return 'ultra-wide';
-  if (/wide/.test(text)) return 'wide';
-  if (/tele|zoom/.test(text)) return 'tele';
-  if (/main|back|rear|standard|1x|1\.0|1,0/.test(text)) return 'main';
-  return 'rear';
-};
-
-const cameraKindPriority: Record<CameraModuleKind, number> = {
-  'ultra-wide': 1,
-  wide: 2,
-  main: 3,
-  rear: 4,
-  tele: 5,
-  front: 6,
-};
-
-const cameraKindLabel: Record<CameraModuleKind, string> = {
-  'ultra-wide': 'Ultra-Wide (0.5x)',
-  wide: 'Wide',
-  main: 'Main (1x)',
-  rear: 'Rear Camera',
-  tele: 'Telephoto',
-  front: 'Front Camera',
-};
-
-const isCustomLensSelectionEnabled = () => {
-  const flags = (window as any).__SW_FEATURES__ || {};
-  return !!flags.customLensSelection;
-};
-
 export function AddItemScreen({ onNavigate }: AddItemScreenProps) {
   const [mode, setMode] = useState<'single' | 'bulk'>('single');
   const [singleFile, setSingleFile] = useState<File | null>(null);
@@ -81,233 +33,47 @@ export function AddItemScreen({ onNavigate }: AddItemScreenProps) {
   const [bulkFabricType, setBulkFabricType] = useState('Cotton');
   const [status, setStatus] = useState('');
   const [saving, setSaving] = useState(false);
-  const [cameraOpen, setCameraOpen] = useState(false);
-  const [cameraError, setCameraError] = useState('');
-  const [customLensSelectionEnabled] = useState(() => isCustomLensSelectionEnabled());
-  const [cameraModules, setCameraModules] = useState<CameraModuleOption[]>([]);
-  const [selectedCameraKey, setSelectedCameraKey] = useState('');
-  const [switchingCamera, setSwitchingCamera] = useState(false);
+  const [demoMode] = useState(() => isDemoModeEnabled());
   const singleRef = useRef<HTMLInputElement>(null);
+  const captureRef = useRef<HTMLInputElement>(null);
   const bulkRef = useRef<HTMLInputElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-
-  const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-  };
-
-  const closeCamera = () => {
-    stopCamera();
-    setCameraOpen(false);
-    setCameraError('');
-    setCameraModules([]);
-    setSelectedCameraKey('');
-    setSwitchingCamera(false);
-  };
-
-  const startCameraStream = async (deviceId?: string) => {
-    const constraints: MediaStreamConstraints = {
-      video: deviceId
-        ? {
-            deviceId: { exact: deviceId },
-          }
-        : {
-            facingMode: { ideal: 'environment' },
-          },
-      audio: false,
-    };
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    stopCamera();
-    streamRef.current = stream;
-    requestAnimationFrame(() => {
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-    });
-    return stream;
-  };
-
-  const loadCameraModules = async (
-    track: MediaStreamTrack | null
-  ): Promise<CameraModuleOption[]> => {
-    if (!navigator.mediaDevices?.enumerateDevices) return [];
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const videos = devices.filter((device) => device.kind === 'videoinput');
-    const modules = videos.map((device, index) => {
-      const label = (device.label || '').trim();
-      const kind = detectCameraKind(label);
-      const fallback = `${cameraKindLabel[kind]} ${index + 1}`;
-      return {
-        key: `device:${device.deviceId}`,
-        deviceId: device.deviceId,
-        label: label || fallback,
-        kind,
-        source: 'device' as const,
-      };
-    });
-
-    // Some Android browsers expose one logical rear camera. If zoom capabilities
-    // include sub-1x, add virtual lens options (0.6x/0.5x etc.) on that track.
-    if (track && typeof (track as any).getCapabilities === 'function') {
-      const capabilities = (track as any).getCapabilities?.() || {};
-      const settings = track.getSettings ? track.getSettings() : ({} as any);
-      const currentDeviceId = settings.deviceId || '';
-      const zoom = capabilities.zoom;
-      if (
-        zoom &&
-        typeof zoom.min === 'number' &&
-        typeof zoom.max === 'number' &&
-        zoom.max > zoom.min
-      ) {
-        const zoomOptions: CameraModuleOption[] = [];
-        if (zoom.min < 0.95) {
-          const ultra = Number(zoom.min.toFixed(2));
-          zoomOptions.push({
-            key: `zoom:${ultra}`,
-            deviceId: currentDeviceId,
-            label: `Ultra-Wide (${ultra}x)`,
-            kind: 'ultra-wide',
-            source: 'zoom',
-            zoomLevel: ultra,
-          });
-        }
-        if (zoom.min <= 1 && zoom.max >= 1) {
-          zoomOptions.push({
-            key: 'zoom:1',
-            deviceId: currentDeviceId,
-            label: 'Main (1x)',
-            kind: 'main',
-            source: 'zoom',
-            zoomLevel: 1,
-          });
-        }
-        if (zoom.max >= 1.8) {
-          const tele = Number(Math.min(2, zoom.max).toFixed(2));
-          zoomOptions.push({
-            key: `zoom:${tele}`,
-            deviceId: currentDeviceId,
-            label: `Telephoto (${tele}x)`,
-            kind: 'tele',
-            source: 'zoom',
-            zoomLevel: tele,
-          });
-        }
-        if (zoomOptions.length > 0) {
-          // If browser already exposed multiple physical modules, prefer those.
-          // Otherwise use virtual zoom-lens options for better control.
-          const distinctDeviceCount = new Set(modules.map((m) => m.deviceId)).size;
-          if (distinctDeviceCount <= 2) {
-            return zoomOptions;
-          }
-        }
-      }
-    }
-
-    return modules;
-  };
-
-  const pickPreferredCamera = (modules: CameraModuleOption[]) => {
-    if (modules.length === 0) return '';
-    const rearFirst = modules.filter((m) => m.kind !== 'front');
-    const source = rearFirst.length > 0 ? rearFirst : modules;
-    const sorted = [...source].sort(
-      (a, b) => cameraKindPriority[a.kind] - cameraKindPriority[b.kind]
-    );
-    return sorted[0].key;
-  };
-
-  const switchCamera = async (module: CameraModuleOption) => {
-    if (!module || switchingCamera) return;
-    setCameraError('');
-    setSwitchingCamera(true);
-    try {
-      if (module.source === 'zoom' && typeof module.zoomLevel === 'number') {
-        const track = streamRef.current?.getVideoTracks()[0];
-        if (!track) throw new Error('No active camera track');
-        await track.applyConstraints({
-          advanced: [{ zoom: module.zoomLevel as any }],
-        } as any);
-      } else {
-        await startCameraStream(module.deviceId);
-      }
-      setSelectedCameraKey(module.key);
-    } catch {
-      setCameraError('Unable to switch camera module. Please try another one.');
-    } finally {
-      setSwitchingCamera(false);
-    }
-  };
-
-  const openCamera = async () => {
-    setCameraError('');
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraError('Camera is not supported in this browser.');
-      return;
-    }
-    try {
-      await startCameraStream();
-      setCameraOpen(true);
-      if (!customLensSelectionEnabled) {
-        setCameraModules([]);
-        setSelectedCameraKey('');
-        return;
-      }
-      const currentTrack = streamRef.current?.getVideoTracks()[0] || null;
-      const modules = await loadCameraModules(currentTrack);
-      setCameraModules(modules);
-
-      const preferredKey = pickPreferredCamera(modules);
-      const preferredModule = modules.find((module) => module.key === preferredKey);
-      if (preferredModule) {
-        await switchCamera(preferredModule);
-      }
-    } catch {
-      setCameraError('Unable to access camera. Please allow permission and try again.');
-    }
-  };
-
-  const capturePhoto = async () => {
-    const video = videoRef.current;
-    if (!video || video.videoWidth === 0 || video.videoHeight === 0) {
-      setCameraError('Camera not ready yet. Please try again.');
-      return;
-    }
-
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const context = canvas.getContext('2d');
-    if (!context) {
-      setCameraError('Unable to capture image.');
-      return;
-    }
-
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob((result) => resolve(result), 'image/jpeg', 0.95);
-    });
-
-    if (!blob) {
-      setCameraError('Capture failed. Please try again.');
-      return;
-    }
-
-    const file = new File([blob], `capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
-    setSingleFile(file);
-    closeCamera();
-  };
-
-  useEffect(() => {
-    return () => {
-      stopCamera();
-    };
-  }, []);
 
   const handleSubmit = async () => {
     setStatus('');
+    
+    // Handle demo mode
+    if (demoMode) {
+      if (!singleFile && bulkFiles.length === 0) {
+        setStatus('Please select a photo.');
+        return;
+      }
+      
+      setSaving(true);
+      setStatus('Analyzing item...');
+      
+      try {
+        const form = new FormData();
+        const response = await apiPost('/api/demo/analyze-item/', form);
+        const payload = await response.json();
+        
+        if (response.ok && payload.status === 'success') {
+          setStatus('Analysis complete');
+          // Navigate to wardrobe after brief delay
+          setTimeout(() => {
+            onNavigate('wardrobe');
+          }, 500);
+        } else {
+          setStatus(payload.message || 'Analysis failed.');
+        }
+      } catch {
+        setStatus('Something went wrong. Please try again.');
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+    
+    // Normal mode (real analysis)
     const form = new FormData();
     form.append('mode', mode);
 
@@ -402,7 +168,7 @@ export function AddItemScreen({ onNavigate }: AddItemScreenProps) {
                   {singleFile ? 'Change Photo' : 'Upload Photo'}
                 </button>
                 <button
-                  onClick={openCamera}
+                  onClick={() => captureRef.current?.click()}
                   className="px-5 py-2 rounded-xl bg-white border border-sand text-charcoal caption font-semibold"
                 >
                   Capture Photo
@@ -411,6 +177,15 @@ export function AddItemScreen({ onNavigate }: AddItemScreenProps) {
                   ref={singleRef}
                   type="file"
                   accept="image/*"
+                  className="hidden"
+                  style={{ display: 'none' }}
+                  onChange={(e) => setSingleFile(e.target.files?.[0] || null)}
+                />
+                <input
+                  ref={captureRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
                   className="hidden"
                   style={{ display: 'none' }}
                   onChange={(e) => setSingleFile(e.target.files?.[0] || null)}
@@ -529,86 +304,6 @@ export function AddItemScreen({ onNavigate }: AddItemScreenProps) {
           <Camera className="w-5 h-5" />
         </motion.button>
       </div>
-
-      {cameraOpen && (
-        <div className="fixed inset-0 z-50 bg-charcoal/70 flex items-center justify-center px-4">
-          <div className="w-full max-w-md rounded-2xl bg-ivory p-4 shadow-xl">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold text-charcoal">Capture Garment Photo</h3>
-              <button
-                onClick={closeCamera}
-                className="w-9 h-9 rounded-full border border-sand flex items-center justify-center"
-                aria-label="Close camera"
-              >
-                <X className="w-5 h-5 text-charcoal" />
-              </button>
-            </div>
-
-            <div className="rounded-xl overflow-hidden bg-black mb-4 aspect-[3/4]">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover"
-              />
-            </div>
-
-            {customLensSelectionEnabled && cameraModules.length > 0 && (
-              <div className="mb-4">
-                <div className="microtext text-charcoal/60 mb-2">Camera Module</div>
-                <div className="grid grid-cols-2 gap-2">
-                  {cameraModules.map((module) => {
-                    return (
-                      <button
-                        key={module.key}
-                        type="button"
-                        disabled={switchingCamera}
-                        onClick={() => switchCamera(module)}
-                        className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                          selectedCameraKey === module.key
-                            ? 'bg-sage text-white'
-                            : 'bg-white border border-sand text-charcoal/70'
-                        } ${switchingCamera ? 'opacity-70' : ''}`}
-                      >
-                        {module.source === 'zoom' ? module.label : cameraKindLabel[module.kind]}
-                      </button>
-                    );
-                  })}
-                </div>
-                {cameraModules.some((module) => module.kind === 'ultra-wide') && (
-                  <div className="caption text-charcoal/60 mt-2">
-                    Ultra-wide is auto-selected when available.
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={closeCamera}
-                className="py-3 rounded-xl border border-sand bg-white text-charcoal font-semibold"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={capturePhoto}
-                className="py-3 rounded-xl bg-sage text-white font-semibold"
-              >
-                Use This Photo
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {cameraError && !cameraOpen && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40">
-          <div className="px-4 py-2 rounded-xl bg-white border border-sand shadow text-sm text-charcoal">
-            {cameraError}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
